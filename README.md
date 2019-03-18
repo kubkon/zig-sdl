@@ -4,7 +4,15 @@ Self-contained SDL2 package for Zig.
 
 ## Current Status
 
-Experimental. The Zig package manager isn't available yet.
+I'm able to build libSDL2.a and then link an application against it,
+but I didn't get past this problem yet:
+
+```
+$ zig build run
+INFO: Unable to initialize SDL: No available video device
+```
+
+Probably need to do some kind of build configuration thing.
 
 ## How to Use this Package
 

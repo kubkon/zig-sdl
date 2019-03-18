@@ -19,6 +19,15 @@ pub fn build(b: *Builder) !void {
     }
     b.default_step.dependOn(&lib.step);
 
+    const exe = b.addExecutable("sdl-zig-demo", "example/main.zig");
+    exe.addIncludeDir("include");
+    exe.setBuildMode(mode);
+    exe.linkLibrary(lib);
+
+    const run = b.step("run", "Run the demo");
+    const run_cmd = exe.run();
+    run.dependOn(&run_cmd.step);
+
     b.installArtifact(lib);
 }
 
@@ -142,8 +151,8 @@ const src_files = [][]const u8{
     "render/direct3d11/SDL_render_d3d11.c",
     "render/direct3d/SDL_shaders_d3d.c",
     "render/direct3d/SDL_render_d3d.c",
-    //"render/opengles2/SDL_render_gles2.c",
-    //"render/opengles2/SDL_shaders_gles2.c",
+    "render/opengles2/SDL_render_gles2.c",
+    "render/opengles2/SDL_shaders_gles2.c",
     "render/opengl/SDL_render_gl.c",
     "render/opengl/SDL_shaders_gl.c",
     "render/opengles/SDL_render_gles.c",
