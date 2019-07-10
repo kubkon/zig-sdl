@@ -4,9 +4,8 @@ Self-contained SDL2 package for Zig.
 
 ## Current Status
 
-I've only experimented with Linux so far. I was able te build
-libSDL2.a and then link an application against it, but there
-would be no video support:
+On Linux, I was able to build libSDL2.a and then link an application against it,
+but there would be no video support:
 
 ```
 $ zig build run
@@ -40,6 +39,7 @@ not stuff from this package, which is these files:
  * README.md
  * build.zig
  * zig-prebuilt/
+ * example/
 
 Next, you'll need access to each supported OS. The current list is:
 
@@ -70,7 +70,7 @@ When I did this, there were no differences. So, the directories are the same. De
 one of them and use the other one.
 
 Ensure the appropriate subdirectory exists within zig-prebuilt. For example, on 64-bit
-Windows, it is `x86_64-windows`. Copy `build-release/include/SDL_config.h` to the
+Windows, it is `x86_64-windows-msvc`. Copy `build-release/include/SDL_config.h` to the
 appropriate subdirectory within `zig-prebuilt`.
 
 Next, look at a `git diff` and use your critical thinking skills to determine if anything
