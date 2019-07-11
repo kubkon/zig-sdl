@@ -6,7 +6,7 @@ const sep_str = path.sep_str;
 const Target = std.build.Target;
 const CrossTarget = std.build.CrossTarget;
 
-pub fn build(b: *Builder) !void {
+pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
     const target = b.standardTargetOptions([_]Target{
         Target{
@@ -25,31 +25,7 @@ pub fn build(b: *Builder) !void {
         },
     });
 
-    const conf_dir = b.fmt(
-        "zig-prebuilt" ++ sep_str ++ "{}-{}-{}",
-        @tagName(target.getArch()),
-        @tagName(target.getOs()),
-        @tagName(target.getAbi()),
-    );
-
-    const lib_cflags = [_][]const u8{"-std=c99"};
-    const lib = b.addStaticLibrary("SDL2", null);
-    lib.setBuildMode(mode);
-    lib.setTheTarget(target);
-    lib.linkSystemLibrary("c");
-    lib.addIncludeDir(conf_dir);
-    lib.addIncludeDir("include");
-    lib.addIncludeDir("src/video/khronos");
-    for (generic_src_files) |src_file| {
-        const full_src_path = try path.join(b.allocator, [_][]const u8{ "src", src_file });
-        lib.addCSourceFile(full_src_path, lib_cflags);
-    }
-    if (target.isWindows()) {
-        for (windows_src_files) |src_file| {
-            const full_src_path = try path.join(b.allocator, [_][]const u8{ "src", src_file });
-            lib.addCSourceFile(full_src_path, lib_cflags);
-        }
-    }
+    const lib = getLibrary(b, mode, target, ".");
     lib.install();
 
     const exe = b.addExecutable("sdl-zig-demo", "example/main.zig");
@@ -63,6 +39,41 @@ pub fn build(b: *Builder) !void {
     const run = b.step("run", "Run the demo");
     const run_cmd = exe.run();
     run.dependOn(&run_cmd.step);
+}
+
+pub fn getLibrary(
+    b: *Builder,
+    mode: builtin.Mode,
+    target: std.build.Target,
+    prefix: []const u8,
+) *std.build.LibExeObjStep {
+    const conf_dir = b.fmt(
+        "{}/zig-prebuilt/{}-{}-{}",
+        prefix,
+        @tagName(target.getArch()),
+        @tagName(target.getOs()),
+        @tagName(target.getAbi()),
+    );
+
+    const lib_cflags = [_][]const u8{"-std=c99"};
+    const lib = b.addStaticLibrary("SDL2", null);
+    lib.setBuildMode(mode);
+    lib.setTheTarget(target);
+    lib.linkSystemLibrary("c");
+    lib.addIncludeDir(conf_dir);
+    lib.addIncludeDir(b.fmt("{}/include", prefix));
+    lib.addIncludeDir(b.fmt("{}/src/video/khronos", prefix));
+    for (generic_src_files) |src_file| {
+        const full_src_path = path.join(b.allocator, [_][]const u8{ "src", src_file }) catch unreachable;
+        lib.addCSourceFile(full_src_path, lib_cflags);
+    }
+    if (target.isWindows()) {
+        for (windows_src_files) |src_file| {
+            const full_src_path = path.join(b.allocator, [_][]const u8{ "src", src_file }) catch unreachable;
+            lib.addCSourceFile(full_src_path, lib_cflags);
+        }
+    }
+    return lib;
 }
 
 const generic_src_files = [_][]const u8{
