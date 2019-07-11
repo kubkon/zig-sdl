@@ -112,7 +112,7 @@
 #define HAVE_STRCHR 1
 #define HAVE_STRRCHR 1
 #define HAVE_STRSTR 1
-#define HAVE_ITOA 1
+/* #undef HAVE_ITOA */
 #define HAVE__LTOA 1
 /* #undef HAVE__UITOA */
 #define HAVE__ULTOA 1

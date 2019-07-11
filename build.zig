@@ -50,6 +50,7 @@ pub fn build(b: *Builder) !void {
             lib.addCSourceFile(full_src_path, lib_cflags);
         }
     }
+    lib.install();
 
     const exe = b.addExecutable("sdl-zig-demo", "example/main.zig");
     exe.addIncludeDir("include");
@@ -57,12 +58,11 @@ pub fn build(b: *Builder) !void {
     exe.setTheTarget(target);
     exe.linkLibrary(lib);
     b.default_step.dependOn(&exe.step);
+    exe.install();
 
     const run = b.step("run", "Run the demo");
     const run_cmd = exe.run();
     run.dependOn(&run_cmd.step);
-
-    b.installArtifact(lib);
 }
 
 const generic_src_files = [_][]const u8{
@@ -95,24 +95,24 @@ const generic_src_files = [_][]const u8{
     "audio/arts/SDL_artsaudio.c",
     "timer/SDL_timer.c",
     "timer/dummy/SDL_systimer.c",
-    "timer/haiku/SDL_systimer.c",
-    "loadso/dummy/SDL_sysloadso.c",
+    //"timer/haiku/SDL_systimer.c",
+    //"loadso/dummy/SDL_sysloadso.c",
     "loadso/dlopen/SDL_sysloadso.c",
-    "power/haiku/SDL_syspower.c",
+    //"power/haiku/SDL_syspower.c",
     "power/SDL_power.c",
     "cpuinfo/SDL_cpuinfo.c",
     "SDL_assert.c",
     "thread/generic/SDL_syscond.c",
-    "thread/generic/SDL_systls.c",
-    "thread/generic/SDL_sysmutex.c",
-    "thread/generic/SDL_systhread.c",
-    "thread/generic/SDL_syssem.c",
+    //"thread/generic/SDL_systls.c",
+    //"thread/generic/SDL_sysmutex.c",
+    //"thread/generic/SDL_systhread.c",
+    //"thread/generic/SDL_syssem.c",
     "thread/SDL_thread.c",
     "SDL_error.c",
     "file/SDL_rwops.c",
     "haptic/SDL_haptic.c",
     "haptic/dummy/SDL_syshaptic.c",
-    "filesystem/dummy/SDL_sysfilesystem.c",
+    //"filesystem/dummy/SDL_sysfilesystem.c",
     "events/SDL_events.c",
     "events/SDL_touch.c",
     "events/SDL_clipboardevents.c",
