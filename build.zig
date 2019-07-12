@@ -60,6 +60,13 @@ pub fn getLibrary(
     lib.setBuildMode(mode);
     lib.setTheTarget(target);
     lib.linkSystemLibrary("c");
+    lib.linkSystemLibrary("setupapi");
+    lib.linkSystemLibrary("winmm");
+    lib.linkSystemLibrary("gdi32");
+    lib.linkSystemLibrary("imm32");
+    lib.linkSystemLibrary("version");
+    lib.linkSystemLibrary("oleaut32");
+    lib.linkSystemLibrary("ole32");
     lib.addIncludeDir(conf_dir);
     lib.addIncludeDir(b.fmt("{}/include", prefix));
     lib.addIncludeDir(b.fmt("{}/src/video/khronos", prefix));
