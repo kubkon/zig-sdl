@@ -41,6 +41,12 @@ pub fn build(b: *Builder) void {
     run.dependOn(&run_cmd.step);
 }
 
+pub fn linkArtifact(b: *Builder, artifact: *std.build.LibExeObjStep, prefix: []const u8) void {
+    const lib = getLibrary(b, artifact.build_mode, artifact.target, prefix);
+    artifact.addIncludeDir(b.fmt("{}/zig-prebuilt/include", prefix));
+    artifact.linkLibrary(lib);
+}
+
 pub fn getLibrary(
     b: *Builder,
     mode: builtin.Mode,
@@ -71,12 +77,12 @@ pub fn getLibrary(
     lib.addIncludeDir(b.fmt("{}/include", prefix));
     lib.addIncludeDir(b.fmt("{}/src/video/khronos", prefix));
     for (generic_src_files) |src_file| {
-        const full_src_path = path.join(b.allocator, [_][]const u8{ "src", src_file }) catch unreachable;
+        const full_src_path = path.join(b.allocator, [_][]const u8{ prefix, "src", src_file }) catch unreachable;
         lib.addCSourceFile(full_src_path, lib_cflags);
     }
     if (target.isWindows()) {
         for (windows_src_files) |src_file| {
-            const full_src_path = path.join(b.allocator, [_][]const u8{ "src", src_file }) catch unreachable;
+            const full_src_path = path.join(b.allocator, [_][]const u8{ prefix, "src", src_file }) catch unreachable;
             lib.addCSourceFile(full_src_path, lib_cflags);
         }
     }
