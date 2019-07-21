@@ -50,11 +50,12 @@ pub const Options = struct {
 pub fn linkArtifact(b: *Builder, options: Options) void {
     const lib = getLibrary(b, options.artifact.build_mode, options.artifact.target, options.prefix);
     options.artifact.addIncludeDir(b.fmt("{}/zig-prebuilt/include", options.prefix));
+    options.artifact.addIncludeDir(b.fmt("{}/zig-prebuilt/include/SDL2", options.prefix));
     options.artifact.linkLibrary(lib);
 
     if (options.gfx) {
         const gfx_lib = getLibGfx(b, options.artifact.build_mode, options.artifact.target, options.prefix);
-        options.artifact.addIncludeDir(b.fmt("{}/extra/gfx", options.prefix));
+        options.artifact.addIncludeDir(b.fmt("{}/extra/gfx/zig-prebuilt/include", options.prefix));
         options.artifact.linkLibrary(gfx_lib);
     }
 }
