@@ -41,10 +41,42 @@ pub fn build(b: *Builder) void {
     run.dependOn(&run_cmd.step);
 }
 
-pub fn linkArtifact(b: *Builder, artifact: *std.build.LibExeObjStep, prefix: []const u8) void {
-    const lib = getLibrary(b, artifact.build_mode, artifact.target, prefix);
-    artifact.addIncludeDir(b.fmt("{}/zig-prebuilt/include", prefix));
-    artifact.linkLibrary(lib);
+pub const Options = struct {
+    artifact: *std.build.LibExeObjStep,
+    prefix: []const u8,
+    gfx: bool = false,
+};
+
+pub fn linkArtifact(b: *Builder, options: Options) void {
+    const lib = getLibrary(b, options.artifact.build_mode, options.artifact.target, options.prefix);
+    options.artifact.addIncludeDir(b.fmt("{}/zig-prebuilt/include", options.prefix));
+    options.artifact.linkLibrary(lib);
+
+    if (options.gfx) {
+        const gfx_lib = getLibGfx(b, options.artifact.build_mode, options.artifact.target, options.prefix);
+        options.artifact.addIncludeDir(b.fmt("{}/extra/gfx", options.prefix));
+        options.artifact.linkLibrary(gfx_lib);
+    }
+}
+
+pub fn getLibGfx(
+    b: *Builder,
+    mode: builtin.Mode,
+    target: std.build.Target,
+    prefix: []const u8,
+) *std.build.LibExeObjStep {
+    const lib_cflags = [_][]const u8{"-std=c99"};
+    const lib = b.addStaticLibrary("SDL2_gfx", null);
+    lib.setBuildMode(mode);
+    lib.setTheTarget(target);
+    lib.linkSystemLibrary("c");
+    lib.addIncludeDir(b.fmt("{}/zig-prebuilt/include/SDL2", prefix));
+    for (generic_gfx_src_files) |src_file| {
+        const full_src_path = path.join(b.allocator, [_][]const u8{ prefix, "extra", "gfx", src_file }) catch unreachable;
+
+        lib.addCSourceFile(full_src_path, lib_cflags);
+    }
+    return lib;
 }
 
 pub fn getLibrary(
@@ -404,4 +436,11 @@ const windows_src_files = [_][]const u8{
     "video/windows/SDL_windowsopengles.c",
     "video/windows/SDL_windowsframebuffer.c",
     "video/windows/SDL_windowsevents.c",
+};
+
+const generic_gfx_src_files = [_][]const u8{
+    "SDL2_imageFilter.c",
+    "SDL2_framerate.c",
+    "SDL2_gfxPrimitives.c",
+    "SDL2_rotozoom.c",
 };
