@@ -45,16 +45,18 @@ pub const Options = struct {
     artifact: *std.build.LibExeObjStep,
     prefix: []const u8,
     gfx: bool = false,
+    override_mode: ?std.builtin.Mode = null,
 };
 
 pub fn linkArtifact(b: *Builder, options: Options) void {
-    const lib = getLibrary(b, options.artifact.build_mode, options.artifact.target, options.prefix);
+    const mode = options.override_mode orelse options.artifact.build_mode;
+    const lib = getLibrary(b, mode, options.artifact.target, options.prefix);
     options.artifact.addIncludeDir(b.fmt("{}/zig-prebuilt/include", options.prefix));
     options.artifact.addIncludeDir(b.fmt("{}/zig-prebuilt/include/SDL2", options.prefix));
     options.artifact.linkLibrary(lib);
 
     if (options.gfx) {
-        const gfx_lib = getLibGfx(b, options.artifact.build_mode, options.artifact.target, options.prefix);
+        const gfx_lib = getLibGfx(b, mode, options.artifact.target, options.prefix);
         options.artifact.addIncludeDir(b.fmt("{}/extra/gfx/zig-prebuilt/include", options.prefix));
         options.artifact.linkLibrary(gfx_lib);
     }
@@ -66,14 +68,14 @@ pub fn getLibGfx(
     target: std.build.Target,
     prefix: []const u8,
 ) *std.build.LibExeObjStep {
-    const lib_cflags = [_][]const u8{"-std=c99"};
+    const lib_cflags = &[_][]const u8{"-std=c99"};
     const lib = b.addStaticLibrary("SDL2_gfx", null);
     lib.setBuildMode(mode);
     lib.setTheTarget(target);
     lib.linkSystemLibrary("c");
     lib.addIncludeDir(b.fmt("{}/zig-prebuilt/include/SDL2", prefix));
     for (generic_gfx_src_files) |src_file| {
-        const full_src_path = path.join(b.allocator, [_][]const u8{ prefix, "extra", "gfx", src_file }) catch unreachable;
+        const full_src_path = path.join(b.allocator, &[_][]const u8{ prefix, "extra", "gfx", src_file }) catch unreachable;
 
         lib.addCSourceFile(full_src_path, lib_cflags);
     }
@@ -94,7 +96,7 @@ pub fn getLibrary(
         @tagName(target.getAbi()),
     );
 
-    const lib_cflags = [_][]const u8{"-std=c99"};
+    const lib_cflags = &[_][]const u8{"-std=c99"};
     const lib = b.addStaticLibrary("SDL2", null);
     lib.setBuildMode(mode);
     lib.setTheTarget(target);
@@ -110,12 +112,12 @@ pub fn getLibrary(
     lib.addIncludeDir(b.fmt("{}/include", prefix));
     lib.addIncludeDir(b.fmt("{}/src/video/khronos", prefix));
     for (generic_src_files) |src_file| {
-        const full_src_path = path.join(b.allocator, [_][]const u8{ prefix, "src", src_file }) catch unreachable;
+        const full_src_path = path.join(b.allocator, &[_][]const u8{ prefix, "src", src_file }) catch unreachable;
         lib.addCSourceFile(full_src_path, lib_cflags);
     }
     if (target.isWindows()) {
         for (windows_src_files) |src_file| {
-            const full_src_path = path.join(b.allocator, [_][]const u8{ prefix, "src", src_file }) catch unreachable;
+            const full_src_path = path.join(b.allocator, &[_][]const u8{ prefix, "src", src_file }) catch unreachable;
             lib.addCSourceFile(full_src_path, lib_cflags);
         }
     }
