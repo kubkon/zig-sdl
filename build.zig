@@ -4,22 +4,19 @@ const Builder = std.build.Builder;
 const path = std.fs.path;
 const sep_str = path.sep_str;
 const Target = std.build.Target;
-const CrossTarget = std.build.CrossTarget;
 
 pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
-    const target = b.standardTargetOptions([_]Target{
-        Target{
-            .Cross = CrossTarget{
-                .arch = .x86_64,
-                .os = .linux,
+    const target = b.standardTargetOptions(.{
+        .whitelist = &[_]Target{
+            .{
+                .cpu_arch = .x86_64,
+                .os_tag = .linux,
                 .abi = .musl,
             },
-        },
-        Target{
-            .Cross = CrossTarget{
-                .arch = .x86_64,
-                .os = .windows,
+            .{
+                .cpu_arch = .x86_64,
+                .os_tag = .windows,
                 .abi = .gnu,
             },
         },
@@ -31,7 +28,7 @@ pub fn build(b: *Builder) void {
     const exe = b.addExecutable("sdl-zig-demo", "example/main.zig");
     exe.addIncludeDir("include");
     exe.setBuildMode(mode);
-    exe.setTheTarget(target);
+    exe.setTarget(target);
     exe.linkLibrary(lib);
     b.default_step.dependOn(&exe.step);
     exe.install();
@@ -71,7 +68,7 @@ pub fn getLibGfx(
     const lib_cflags = &[_][]const u8{"-std=c99"};
     const lib = b.addStaticLibrary("SDL2_gfx", null);
     lib.setBuildMode(mode);
-    lib.setTheTarget(target);
+    lib.setTarget(target);
     lib.linkSystemLibrary("c");
     lib.addIncludeDir(b.fmt("{}/zig-prebuilt/include/SDL2", .{prefix}));
     for (generic_gfx_src_files) |src_file| {
@@ -90,15 +87,15 @@ pub fn getLibrary(
 ) *std.build.LibExeObjStep {
     const conf_dir = b.fmt("{}/zig-prebuilt/{}-{}-{}", .{
         prefix,
-        @tagName(target.getArch()),
-        @tagName(target.getOs()),
+        @tagName(target.getCpuArch()),
+        @tagName(target.getOsTag()),
         @tagName(target.getAbi()),
     });
 
     const lib_cflags = &[_][]const u8{"-std=c99"};
     const lib = b.addStaticLibrary("SDL2", null);
     lib.setBuildMode(mode);
-    lib.setTheTarget(target);
+    lib.setTarget(target);
     lib.linkSystemLibrary("c");
     lib.linkSystemLibrary("setupapi");
     lib.linkSystemLibrary("winmm");
