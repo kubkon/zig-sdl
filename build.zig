@@ -1,5 +1,5 @@
-const builtin = @import("builtin");
 const std = @import("std");
+const builtin = @import("builtin");
 const Builder = std.build.Builder;
 const path = std.fs.path;
 const sep_str = path.sep_str;
@@ -54,6 +54,7 @@ pub fn linkArtifact(b: *Builder, options: Options) void {
 
     if (options.gfx) {
         const gfx_lib = getLibGfx(b, mode, options.artifact.target, options.prefix);
+        options.artifact.addIncludeDir(b.fmt("{s}/include", .{options.prefix}));
         options.artifact.addIncludeDir(b.fmt("{s}/extra/gfx/zig-prebuilt/include", .{options.prefix}));
         options.artifact.linkLibrary(gfx_lib);
     }
@@ -61,7 +62,7 @@ pub fn linkArtifact(b: *Builder, options: Options) void {
 
 pub fn getLibGfx(
     b: *Builder,
-    mode: builtin.Mode,
+    mode: std.builtin.Mode,
     target: std.build.Target,
     prefix: []const u8,
 ) *std.build.LibExeObjStep {
@@ -81,7 +82,7 @@ pub fn getLibGfx(
 
 pub fn getLibrary(
     b: *Builder,
-    mode: builtin.Mode,
+    mode: std.builtin.Mode,
     target: std.build.Target,
     prefix: []const u8,
 ) *std.build.LibExeObjStep {
@@ -92,18 +93,32 @@ pub fn getLibrary(
         @tagName(target.getAbi()),
     });
 
-    const lib_cflags = &[_][]const u8{"-std=c99"};
+    const lib_cflags = &[_][]const u8{};
     const lib = b.addStaticLibrary("SDL2", null);
     lib.setBuildMode(mode);
     lib.setTarget(target);
     lib.linkSystemLibrary("c");
-    lib.linkSystemLibrary("setupapi");
-    lib.linkSystemLibrary("winmm");
-    lib.linkSystemLibrary("gdi32");
-    lib.linkSystemLibrary("imm32");
-    lib.linkSystemLibrary("version");
-    lib.linkSystemLibrary("oleaut32");
-    lib.linkSystemLibrary("ole32");
+    if (target.isWindows()) {
+        lib.linkSystemLibrary("setupapi");
+        lib.linkSystemLibrary("winmm");
+        lib.linkSystemLibrary("gdi32");
+        lib.linkSystemLibrary("imm32");
+        lib.linkSystemLibrary("version");
+        lib.linkSystemLibrary("oleaut32");
+        lib.linkSystemLibrary("ole32");
+    } else if (target.isDarwin()) {
+        lib.linkFramework("OpenGL");
+        lib.linkFramework("Metal");
+        lib.linkFramework("CoreVideo");
+        lib.linkFramework("Cocoa");
+        lib.linkFramework("IOKit");
+        lib.linkFramework("ForceFeedback");
+        lib.linkFramework("Carbon");
+        lib.linkFramework("CoreAudio");
+        lib.linkFramework("AudioToolbox");
+        lib.linkFramework("AVFoundation");
+        lib.linkFramework("Foundation");
+    }
     lib.addIncludeDir(conf_dir);
     lib.addIncludeDir(b.fmt("{s}/include", .{prefix}));
     lib.addIncludeDir(b.fmt("{s}/src/video/khronos", .{prefix}));
@@ -113,6 +128,11 @@ pub fn getLibrary(
     }
     if (target.isWindows()) {
         for (windows_src_files) |src_file| {
+            const full_src_path = path.join(b.allocator, &[_][]const u8{ prefix, "src", src_file }) catch unreachable;
+            lib.addCSourceFile(full_src_path, lib_cflags);
+        }
+    } else if (target.isDarwin()) {
+        for (darwin_src_files) |src_file| {
             const full_src_path = path.join(b.allocator, &[_][]const u8{ prefix, "src", src_file }) catch unreachable;
             lib.addCSourceFile(full_src_path, lib_cflags);
         }
@@ -196,7 +216,7 @@ const generic_src_files = [_][]const u8{
     "SDL_hints.c",
     "SDL.c",
     "SDL_dataqueue.c",
-    "dynapi/SDL_dynapi.c",
+    //"dynapi/SDL_dynapi.c",
     "libm/e_log.c",
     "libm/s_copysign.c",
     "libm/e_fmod.c",
@@ -226,6 +246,7 @@ const generic_src_files = [_][]const u8{
     "joystick/dummy/SDL_sysjoystick.c",
     "joystick/SDL_gamecontroller.c",
     "joystick/steam/SDL_steamcontroller.c",
+    "joystick/virtual/SDL_virtualjoystick.c",
     "video/yuv2rgb/yuv_rgb.c",
     "video/SDL_vulkan_utils.c",
     "video/SDL_blit_1.c",
@@ -278,6 +299,7 @@ const generic_src_files = [_][]const u8{
     "stdlib/SDL_stdlib.c",
     "stdlib/SDL_getenv.c",
     "stdlib/SDL_qsort.c",
+    "stdlib/SDL_crc32.c",
 };
 
 const linux_src_files = [_][]const u8{
@@ -435,6 +457,51 @@ const windows_src_files = [_][]const u8{
     "video/windows/SDL_windowsopengles.c",
     "video/windows/SDL_windowsframebuffer.c",
     "video/windows/SDL_windowsevents.c",
+};
+
+const darwin_src_files = [_][]const u8{
+    "file/cocoa/SDL_rwopsbundlesupport.m",
+    "misc/macosx/SDL_sysurl.m",
+    //"audio/coreaudio/SDL_coreaudio.m",
+    //"hidapi/SDL_hidapi.c",
+    "joystick/darwin/SDL_iokitjoystick.c",
+    //"joystick/iphoneos/SDL_mfijoystick.m",
+    //"joystick/hidapi/SDL_hidapi_gamecube.c",
+    //"joystick/hidapi/SDL_hidapi_luna.c",
+    //"joystick/hidapi/SDL_hidapi_ps4.c",
+    //"joystick/hidapi/SDL_hidapi_ps5.c",
+    //"joystick/hidapi/SDL_hidapi_rumble.c",
+    //"joystick/hidapi/SDL_hidapi_stadia.c",
+    //"joystick/hidapi/SDL_hidapi_steam.c",
+    //"joystick/hidapi/SDL_hidapi_switch.c",
+    //"joystick/hidapi/SDL_hidapi_xbox360.c",
+    //"joystick/hidapi/SDL_hidapi_xbox360w.c",
+    //"joystick/hidapi/SDL_hidapi_xboxone.c",
+    //"joystick/hidapi/SDL_hidapijoystick.c",
+    "haptic/darwin/SDL_syshaptic.c",
+    "power/macosx/SDL_syspower.c",
+    "locale/macosx/SDL_syslocale.m",
+    "timer/unix/SDL_systimer.c",
+    "filesystem/cocoa/SDL_sysfilesystem.m",
+    "thread/pthread/SDL_systhread.c",
+    "thread/pthread/SDL_sysmutex.c",
+    "thread/pthread/SDL_syscond.c",
+    "thread/pthread/SDL_syssem.c",
+    "thread/pthread/SDL_systls.c",
+    "render/metal/SDL_render_metal.m",
+    "video/cocoa/SDL_cocoaclipboard.m",
+    "video/cocoa/SDL_cocoaevents.m",
+    "video/cocoa/SDL_cocoakeyboard.m",
+    "video/cocoa/SDL_cocoamessagebox.m",
+    "video/cocoa/SDL_cocoametalview.m",
+    "video/cocoa/SDL_cocoamodes.m",
+    "video/cocoa/SDL_cocoamouse.m",
+    "video/cocoa/SDL_cocoaopengl.m",
+    "video/cocoa/SDL_cocoaopengles.m",
+    "video/cocoa/SDL_cocoashape.m",
+    "video/cocoa/SDL_cocoavideo.m",
+    "video/cocoa/SDL_cocoavulkan.m",
+    "video/cocoa/SDL_cocoawindow.m",
 };
 
 const generic_gfx_src_files = [_][]const u8{

@@ -1,10 +1,26 @@
-//=================== Copyright Valve Corporation, All rights reserved. =======
-//
+/*
+  Simple DirectMedia Layer
+  Copyright (C) 2021 Valve Corporation
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+*/
 // Purpose: A wrapper implementing "HID" API for Android
 //
 //          This layer glues the hidapi API to Android's USB and BLE stack.
-//
-//=============================================================================
 
 #include <jni.h>
 #include <android/log.h>
@@ -436,6 +452,12 @@ public:
 		g_JVM->AttachCurrentThread( &env, NULL );
 		pthread_setspecific( g_ThreadKey, (void*)env );
 
+		if ( !g_HIDDeviceManagerCallbackHandler )
+		{
+			LOGV( "Device open without callback handler" );
+			return false;
+		}
+
 		m_bIsWaitingForOpen = false;
 		m_bOpenResult = env->CallBooleanMethod( g_HIDDeviceManagerCallbackHandler, g_midHIDDeviceManagerOpen, m_nId );
 		ExceptionCheck( env, "BOpen" );
@@ -545,11 +567,18 @@ public:
 		g_JVM->AttachCurrentThread( &env, NULL );
 		pthread_setspecific( g_ThreadKey, (void*)env );
 
-		jbyteArray pBuf = NewByteArray( env, pData, nDataLen );
-		int nRet = env->CallIntMethod( g_HIDDeviceManagerCallbackHandler, g_midHIDDeviceManagerSendOutputReport, m_nId, pBuf );
-		ExceptionCheck( env, "SendOutputReport" );
-
-		env->DeleteLocalRef( pBuf );
+		int nRet = -1;
+		if ( g_HIDDeviceManagerCallbackHandler )
+		{
+			jbyteArray pBuf = NewByteArray( env, pData, nDataLen );
+			nRet = env->CallIntMethod( g_HIDDeviceManagerCallbackHandler, g_midHIDDeviceManagerSendOutputReport, m_nId, pBuf );
+			ExceptionCheck( env, "SendOutputReport" );
+			env->DeleteLocalRef( pBuf );
+		}
+		else
+		{
+			LOGV( "SendOutputReport without callback handler" );
+		}
 		return nRet;
 	}
 
@@ -560,10 +589,18 @@ public:
 		g_JVM->AttachCurrentThread( &env, NULL );
 		pthread_setspecific( g_ThreadKey, (void*)env );
 
-		jbyteArray pBuf = NewByteArray( env, pData, nDataLen );
-		int nRet = env->CallIntMethod( g_HIDDeviceManagerCallbackHandler, g_midHIDDeviceManagerSendFeatureReport, m_nId, pBuf );
-		ExceptionCheck( env, "SendFeatureReport" );
-		env->DeleteLocalRef( pBuf );
+		int nRet = -1;
+		if ( g_HIDDeviceManagerCallbackHandler )
+		{
+			jbyteArray pBuf = NewByteArray( env, pData, nDataLen );
+			nRet = env->CallIntMethod( g_HIDDeviceManagerCallbackHandler, g_midHIDDeviceManagerSendFeatureReport, m_nId, pBuf );
+			ExceptionCheck( env, "SendFeatureReport" );
+			env->DeleteLocalRef( pBuf );
+		}
+		else
+		{
+			LOGV( "SendFeatureReport without callback handler" );
+		}
 		return nRet;
 	}
 
@@ -586,6 +623,12 @@ public:
 		JNIEnv *env;
 		g_JVM->AttachCurrentThread( &env, NULL );
 		pthread_setspecific( g_ThreadKey, (void*)env );
+
+		if ( !g_HIDDeviceManagerCallbackHandler )
+		{
+			LOGV( "GetFeatureReport without callback handler" );
+			return -1;
+		}
 
 		{
 			hid_mutex_guard cvl( &m_cvLock );
@@ -657,8 +700,11 @@ public:
 		g_JVM->AttachCurrentThread( &env, NULL );
 		pthread_setspecific( g_ThreadKey, (void*)env );
 
-		env->CallVoidMethod( g_HIDDeviceManagerCallbackHandler, g_midHIDDeviceManagerClose, m_nId );
-		ExceptionCheck( env, "Close" );
+		if ( g_HIDDeviceManagerCallbackHandler )
+		{
+			env->CallVoidMethod( g_HIDDeviceManagerCallbackHandler, g_midHIDDeviceManagerClose, m_nId );
+			ExceptionCheck( env, "Close" );
+		}
 	
 		hid_mutex_guard dataLock( &m_dataLock );
 		m_vecData.clear();
@@ -739,7 +785,7 @@ extern "C"
 JNIEXPORT void JNICALL HID_DEVICE_MANAGER_JAVA_INTERFACE(HIDDeviceReleaseCallback)(JNIEnv *env, jobject thiz);
 
 extern "C"
-JNIEXPORT void JNICALL HID_DEVICE_MANAGER_JAVA_INTERFACE(HIDDeviceConnected)(JNIEnv *env, jobject thiz, int nDeviceID, jstring sIdentifier, int nVendorId, int nProductId, jstring sSerialNumber, int nReleaseNumber, jstring sManufacturer, jstring sProduct, int nInterface );
+JNIEXPORT void JNICALL HID_DEVICE_MANAGER_JAVA_INTERFACE(HIDDeviceConnected)(JNIEnv *env, jobject thiz, int nDeviceID, jstring sIdentifier, int nVendorId, int nProductId, jstring sSerialNumber, int nReleaseNumber, jstring sManufacturer, jstring sProduct, int nInterface, int nInterfaceClass, int nInterfaceSubclass, int nInterfaceProtocol );
 
 extern "C"
 JNIEXPORT void JNICALL HID_DEVICE_MANAGER_JAVA_INTERFACE(HIDDeviceOpenPending)(JNIEnv *env, jobject thiz, int nDeviceID);
@@ -828,7 +874,7 @@ JNIEXPORT void JNICALL HID_DEVICE_MANAGER_JAVA_INTERFACE(HIDDeviceReleaseCallbac
 }
 
 extern "C"
-JNIEXPORT void JNICALL HID_DEVICE_MANAGER_JAVA_INTERFACE(HIDDeviceConnected)(JNIEnv *env, jobject thiz, int nDeviceID, jstring sIdentifier, int nVendorId, int nProductId, jstring sSerialNumber, int nReleaseNumber, jstring sManufacturer, jstring sProduct, int nInterface )
+JNIEXPORT void JNICALL HID_DEVICE_MANAGER_JAVA_INTERFACE(HIDDeviceConnected)(JNIEnv *env, jobject thiz, int nDeviceID, jstring sIdentifier, int nVendorId, int nProductId, jstring sSerialNumber, int nReleaseNumber, jstring sManufacturer, jstring sProduct, int nInterface, int nInterfaceClass, int nInterfaceSubclass, int nInterfaceProtocol )
 {
 	LOGV( "HIDDeviceConnected() id=%d VID/PID = %.4x/%.4x, interface %d\n", nDeviceID, nVendorId, nProductId, nInterface );
 
@@ -842,6 +888,9 @@ JNIEXPORT void JNICALL HID_DEVICE_MANAGER_JAVA_INTERFACE(HIDDeviceConnected)(JNI
 	pInfo->manufacturer_string = CreateWStringFromJString( env, sManufacturer );
 	pInfo->product_string = CreateWStringFromJString( env, sProduct );
 	pInfo->interface_number = nInterface;
+	pInfo->interface_class = nInterfaceClass;
+	pInfo->interface_subclass = nInterfaceSubclass;
+	pInfo->interface_protocol = nInterfaceProtocol;
 
 	hid_device_ref<CHIDDevice> pDevice( new CHIDDevice( nDeviceID, pInfo ) );
 
@@ -1027,25 +1076,66 @@ HID_API_EXPORT hid_device * HID_API_CALL hid_open_path(const char *path, int bEx
 
 int  HID_API_EXPORT HID_API_CALL hid_write(hid_device *device, const unsigned char *data, size_t length)
 {
-	LOGV( "hid_write id=%d length=%u", device->m_nId, length );
-	hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
-	if ( pDevice )
+	if ( device )
 	{
-		return pDevice->SendOutputReport( data, length );
+		LOGV( "hid_write id=%d length=%u", device->m_nId, length );
+		hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
+		if ( pDevice )
+		{
+			return pDevice->SendOutputReport( data, length );
+		}
 	}
 	return -1; // Controller was disconnected
 }
 
-// TODO: Implement timeout?
+static uint32_t getms()
+{
+	struct timeval now;
+
+	gettimeofday(&now, NULL);
+	return (uint32_t)(now.tv_sec * 1000 + now.tv_usec / 1000);
+}
+
+static void delayms(uint32_t ms)
+{
+    int was_error;
+
+    struct timespec elapsed, tv;
+
+    /* Set the timeout interval */
+    elapsed.tv_sec = ms / 1000;
+    elapsed.tv_nsec = (ms % 1000) * 1000000;
+    do {
+        errno = 0;
+
+        tv.tv_sec = elapsed.tv_sec;
+        tv.tv_nsec = elapsed.tv_nsec;
+        was_error = nanosleep(&tv, &elapsed);
+    } while (was_error && (errno == EINTR));
+}
+
 int HID_API_EXPORT HID_API_CALL hid_read_timeout(hid_device *device, unsigned char *data, size_t length, int milliseconds)
 {
-//	LOGV( "hid_read_timeout id=%d length=%u timeout=%d", device->m_nId, length, milliseconds );
-	hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
-	if ( pDevice )
+	if ( device )
 	{
-		return pDevice->GetInput( data, length );
+//		LOGV( "hid_read_timeout id=%d length=%u timeout=%d", device->m_nId, length, milliseconds );
+		hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
+		if ( pDevice )
+		{
+			int nResult = pDevice->GetInput( data, length );
+			if ( nResult == 0 && milliseconds > 0 )
+			{
+				uint32_t start = getms();
+				do
+				{
+					delayms( 1 );
+					nResult = pDevice->GetInput( data, length );
+				} while ( nResult == 0 && ( getms() - start ) < milliseconds );
+			}
+			return nResult;
+		}
+		LOGV( "controller was disconnected" );
 	}
-	LOGV( "controller was disconnected" );
 	return -1; // Controller was disconnected
 }
 
@@ -1064,11 +1154,14 @@ int  HID_API_EXPORT HID_API_CALL hid_set_nonblocking(hid_device *device, int non
 
 int HID_API_EXPORT HID_API_CALL hid_send_feature_report(hid_device *device, const unsigned char *data, size_t length)
 {
-	LOGV( "hid_send_feature_report id=%d length=%u", device->m_nId, length );
-	hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
-	if ( pDevice )
+	if ( device )
 	{
-		return pDevice->SendFeatureReport( data, length );
+		LOGV( "hid_send_feature_report id=%d length=%u", device->m_nId, length );
+		hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
+		if ( pDevice )
+		{
+			return pDevice->SendFeatureReport( data, length );
+		}
 	}
 	return -1; // Controller was disconnected
 }
@@ -1077,11 +1170,14 @@ int HID_API_EXPORT HID_API_CALL hid_send_feature_report(hid_device *device, cons
 // Synchronous operation. Will block until completed.
 int HID_API_EXPORT HID_API_CALL hid_get_feature_report(hid_device *device, unsigned char *data, size_t length)
 {
-	LOGV( "hid_get_feature_report id=%d length=%u", device->m_nId, length );
-	hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
-	if ( pDevice )
+	if ( device )
 	{
-		return pDevice->GetFeatureReport( data, length );
+		LOGV( "hid_get_feature_report id=%d length=%u", device->m_nId, length );
+		hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
+		if ( pDevice )
+		{
+			return pDevice->GetFeatureReport( data, length );
+		}
 	}
 	return -1; // Controller was disconnected
 }
@@ -1089,54 +1185,65 @@ int HID_API_EXPORT HID_API_CALL hid_get_feature_report(hid_device *device, unsig
 
 void HID_API_EXPORT HID_API_CALL hid_close(hid_device *device)
 {
-	LOGV( "hid_close id=%d", device->m_nId );
-	hid_mutex_guard r( &g_DevicesRefCountMutex );
-	LOGD("Decrementing device %d (%p), refCount = %d\n", device->m_nId, device, device->m_nDeviceRefCount - 1);
-	if ( --device->m_nDeviceRefCount == 0 )
+	if ( device )
 	{
-		hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
-		if ( pDevice )
+		LOGV( "hid_close id=%d", device->m_nId );
+		hid_mutex_guard r( &g_DevicesRefCountMutex );
+		LOGD("Decrementing device %d (%p), refCount = %d\n", device->m_nId, device, device->m_nDeviceRefCount - 1);
+		if ( --device->m_nDeviceRefCount == 0 )
 		{
-			pDevice->Close( true );
+			hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
+			if ( pDevice )
+			{
+				pDevice->Close( true );
+			}
+			else
+			{
+				delete device;
+			}
+			LOGD("Deleted device %p\n", device);
 		}
-		else
-		{
-			delete device;
-		}
-		LOGD("Deleted device %p\n", device);
 	}
-
 }
 
 int HID_API_EXPORT_CALL hid_get_manufacturer_string(hid_device *device, wchar_t *string, size_t maxlen)
 {
-	hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
-	if ( pDevice )
+	if ( device )
 	{
-		wcsncpy( string, pDevice->GetDeviceInfo()->manufacturer_string, maxlen );
-		return 0;
+		hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
+		if ( pDevice )
+		{
+			wcsncpy( string, pDevice->GetDeviceInfo()->manufacturer_string, maxlen );
+			return 0;
+		}
 	}
 	return -1;
 }
 
 int HID_API_EXPORT_CALL hid_get_product_string(hid_device *device, wchar_t *string, size_t maxlen)
 {
-	hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
-	if ( pDevice )
+	if ( device )
 	{
-		wcsncpy( string, pDevice->GetDeviceInfo()->product_string, maxlen );
-		return 0;
+		hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
+		if ( pDevice )
+		{
+			wcsncpy( string, pDevice->GetDeviceInfo()->product_string, maxlen );
+			return 0;
+		}
 	}
 	return -1;
 }
 
 int HID_API_EXPORT_CALL hid_get_serial_number_string(hid_device *device, wchar_t *string, size_t maxlen)
 {
-	hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
-	if ( pDevice )
+	if ( device )
 	{
-		wcsncpy( string, pDevice->GetDeviceInfo()->serial_number, maxlen );
-		return 0;
+		hid_device_ref<CHIDDevice> pDevice = FindDevice( device->m_nId );
+		if ( pDevice )
+		{
+			wcsncpy( string, pDevice->GetDeviceInfo()->serial_number, maxlen );
+			return 0;
+		}
 	}
 	return -1;
 }
