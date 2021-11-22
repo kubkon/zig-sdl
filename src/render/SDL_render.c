@@ -386,7 +386,7 @@ QueueCmdSetClipRect(SDL_Renderer *renderer)
 static int
 QueueCmdSetDrawColor(SDL_Renderer *renderer, const Uint8 r, const Uint8 g, const Uint8 b, const Uint8 a)
 {
-    const Uint32 color = ((a << 24) | (r << 16) | (g << 8) | b);
+    const Uint32 color = (((Uint32)a << 24) | (r << 16) | (g << 8) | b);
     int retval = 0;
 
     if (!renderer->color_queued || (color != renderer->last_queued_color)) {
